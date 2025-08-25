@@ -11,7 +11,7 @@ The script is designed to:
 
 ## Files
 - `cron_monitor.sh` — main script. Make it executable and run it from the project root.
-- `monitor.sh` — example runner that sets variables inline and runs the monitor (optional).
+- `monitor.example.sh` — example runner that sets variables inline and runs the monitor (optional).
 
 
 ## Prerequisites
