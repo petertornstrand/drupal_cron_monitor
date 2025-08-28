@@ -290,6 +290,9 @@ log "Cron last run: ${last_human} (${cron_last})"
 log "Age (seconds): ${age}; threshold: ${THRESHOLD_SECONDS}"
 log "Drupal root: ${DRUPAL_ROOT}"
 log "State file: ${STATE_FILE}"
+if [[ -n "${MULTISITE_HOST:-}" ]]; then
+  log "Multisite host: ${MULTISITE_HOST}"
+fi
 
 if (( age <= THRESHOLD_SECONDS )); then
   log "Cron is within threshold; nothing to do."
@@ -312,11 +315,17 @@ if (( last_sent >= cron_last )); then
 fi
 
 summary="Cron has not run for over $(( THRESHOLD_SECONDS / 3600 )) hours on ${site_display}"
+# Optional line for multisite host in output/description
+multisite_line=""
+if [[ -n "${MULTISITE_HOST:-}" ]]; then
+  multisite_line="Multisite host: ${MULTISITE_HOST}
+"
+fi
 description=$(cat <<DESC
 Automatic alert from cron_monitor.sh
 
 Site: ${site_display}
-Host: ${host}
+${multisite_line}Host: ${host}
 Environment Path: $(pwd)
 
 Last cron run: ${last_human} (epoch ${cron_last})
