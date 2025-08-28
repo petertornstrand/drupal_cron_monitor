@@ -106,7 +106,19 @@ MULTISITE_HOST=${CB_MULTISITE_HOST:-}
 
 # State file to avoid duplicate tickets while the issue persists
 STATE_DIR=${CB_STATE_DIR:-".monitor_state"}
-STATE_FILE=${CB_STATE_FILE:-"$STATE_DIR/cron_monitor.last_sent"}
+# If CB_STATE_FILE is explicitly provided, use it as-is. Otherwise, make the file name
+# unique per multisite host when CB_MULTISITE_HOST is set.
+if [[ -n "${CB_STATE_FILE:-}" ]]; then
+  STATE_FILE="${CB_STATE_FILE}"
+else
+  if [[ -n "${CB_MULTISITE_HOST:-}" ]]; then
+    # Sanitize host to be filesystem-friendly: replace non-alphanumerics with underscores
+    _cb_host_sanitized=$(echo -n "${CB_MULTISITE_HOST}" | sed -E 's/[^A-Za-z0-9]+/_/g')
+    STATE_FILE="${STATE_DIR}/cron_monitor.${_cb_host_sanitized}.last_sent"
+  else
+    STATE_FILE="${STATE_DIR}/cron_monitor.last_sent"
+  fi
+fi
 
 # Verbosity and dry-run controls
 VERBOSE=${CB_VERBOSE:-1}              # 1 = verbose, 0 = quiet
@@ -277,6 +289,7 @@ log "Current time: ${now_human} (${now})"
 log "Cron last run: ${last_human} (${cron_last})"
 log "Age (seconds): ${age}; threshold: ${THRESHOLD_SECONDS}"
 log "Drupal root: ${DRUPAL_ROOT}"
+log "State file: ${STATE_FILE}"
 
 if (( age <= THRESHOLD_SECONDS )); then
   log "Cron is within threshold; nothing to do."
