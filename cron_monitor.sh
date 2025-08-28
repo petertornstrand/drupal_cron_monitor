@@ -54,11 +54,18 @@
 # - Drush command resolution: prefers "ddev drush" when DDEV is available; otherwise tries ./vendor/bin/drush, then system drush.
 # - The script uses a simple state file to prevent duplicate tickets while the same stale window persists.
 #
+# Drupal root configuration
+# - CB_DRUPAL_ROOT (unset)
+#     Optional: Absolute path to Drupal project root (directory containing vendor directory).
+#     If omitted, the script assumes the root directory is the same as this script's containing directory.
+#     Drush will be executed from that directory to ensure correct bootstrap.
+#
 # Examples
 #   # One-off dry run with explicit settings
 #   CB_ACCOUNT=myacct CB_PROJECT_PERMALINK=myproj CB_USERNAME=jane CB_API_KEY=abc123 CB_DRY_RUN=1 ./cron_monitor.sh
 #
 #   # Persistent environment setup
+#   export CB_DRUPAL_ROOT=/var/www/html
 #   export CB_ACCOUNT=myacct
 #   export CB_PROJECT_PERMALINK=myproj
 #   export CB_USERNAME=jane
@@ -105,6 +112,10 @@ STATE_FILE=${CB_STATE_FILE:-"$STATE_DIR/cron_monitor.last_sent"}
 VERBOSE=${CB_VERBOSE:-1}              # 1 = verbose, 0 = quiet
 DRY_RUN=${CB_DRY_RUN:-0}              # 1 = do not actually create a ticket
 
+# Drupal root directory (working directory for drush)
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)"
+DRUPAL_ROOT=${CB_DRUPAL_ROOT:-"$SCRIPT_DIR"}
+
 # ========================
 # Helpers
 # ========================
@@ -128,8 +139,8 @@ resolve_drush() {
     echo "ddev drush"
     return 0
   fi
-  if [[ -x "./vendor/bin/drush" ]]; then
-    echo "./vendor/bin/drush"
+  if [[ -x "${DRUPAL_ROOT}/vendor/bin/drush" ]]; then
+    echo "${DRUPAL_ROOT}/vendor/bin/drush"
     return 0
   fi
   if have_cmd drush; then
@@ -153,8 +164,10 @@ get_cron_last() {
   if [[ -n "${MULTISITE_HOST:-}" ]]; then
     site_flag="-l ${MULTISITE_HOST}"
   fi
-  if ! value=$($drush_cmd $site_flag state:get system.cron_last 2>/dev/null | tr -d '\r'); then
-    err "Failed to get system.cron_last via drush."
+
+  # Execute drush from the configured Drupal root to ensure correct bootstrap
+  if ! value=$( (cd "$DRUPAL_ROOT" && $drush_cmd $site_flag state:get system.cron_last) 2>/dev/null | tr -d '\r'); then
+    err "Failed to get system.cron_last via drush (root: $DRUPAL_ROOT)."
     return 3
   fi
 
@@ -263,6 +276,7 @@ now_human=$(date "+%Y-%m-%d %H:%M:%S %Z")
 log "Current time: ${now_human} (${now})"
 log "Cron last run: ${last_human} (${cron_last})"
 log "Age (seconds): ${age}; threshold: ${THRESHOLD_SECONDS}"
+log "Drupal root: ${DRUPAL_ROOT}"
 
 if (( age <= THRESHOLD_SECONDS )); then
   log "Cron is within threshold; nothing to do."
